@@ -465,8 +465,7 @@ where
 
 impl<T> BinSerialize for Cow<'_, T>
 where
-    T: Clone,
-    T: BinSerialize,
+    T: BinSerialize + ToOwned,
 {
     fn serialize<S: BinSerializer>(&self, serializer: S) -> Result<()> {
         (&**self).serialize(serializer)
