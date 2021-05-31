@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, HashSet};
 use std::convert::{Infallible, TryInto};
@@ -459,5 +460,26 @@ where
 {
     fn deserialize<D: BinDeserializer<'de>>(deserializer: D) -> Result<Self, Error> {
         Ok(Cell::new(T::deserialize(deserializer)?))
+    }
+}
+
+impl<T> BinSerialize for Cow<'_, T>
+where
+    T: Clone,
+    T: BinSerialize,
+{
+    fn serialize<S: BinSerializer>(&self, serializer: S) -> Result<()> {
+        (&**self).serialize(serializer)
+    }
+}
+
+// For convenience, deserializing into the owned variant here.
+impl<'de, T> BinDeserialize<'de> for Cow<'_, T>
+where
+    T: ToOwned + Clone,
+    T::Owned: BinDeserialize<'de>,
+{
+    fn deserialize<D: BinDeserializer<'de>>(deserializer: D) -> Result<Self> {
+        Ok(Cow::Owned(BinDeserialize::deserialize(deserializer)?))
     }
 }
