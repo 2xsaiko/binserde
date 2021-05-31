@@ -5,6 +5,7 @@ use std::convert::{Infallible, TryInto};
 use std::hash::Hash;
 use std::mem::MaybeUninit;
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 
 use byteorder::{ReadBytesExt, WriteBytesExt, LE};
 
@@ -480,5 +481,21 @@ where
 {
     fn deserialize<D: BinDeserializer<'de>>(deserializer: D) -> Result<Self> {
         Ok(Cow::Owned(BinDeserialize::deserialize(deserializer)?))
+    }
+}
+
+impl BinSerialize for Duration {
+    fn serialize<S: BinSerializer>(&self, mut serializer: S) -> Result<()> {
+        self.as_secs().serialize(&mut serializer)?;
+        self.subsec_nanos().serialize(&mut serializer)?;
+        Ok(())
+    }
+}
+
+impl<'de> BinDeserialize<'de> for Duration {
+    fn deserialize<D: BinDeserializer<'de>>(mut deserializer: D) -> Result<Self> {
+        let secs = u64::deserialize(&mut deserializer)?;
+        let nanos = u32::deserialize(&mut deserializer)?;
+        Ok(Duration::new(secs, nanos))
     }
 }
