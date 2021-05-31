@@ -427,7 +427,7 @@ where
 
 impl<T> BinSerialize for RefCell<T>
 where
-    T: BinSerialize,
+    T: BinSerialize + ?Sized,
 {
     fn serialize<S: BinSerializer>(&self, serializer: S) -> Result<(), Error> {
         self.try_borrow()
@@ -447,7 +447,7 @@ where
 
 impl<T> BinSerialize for Cell<T>
 where
-    T: BinSerialize + Copy,
+    T: BinSerialize + Copy + ?Sized,
 {
     fn serialize<S: BinSerializer>(&self, serializer: S) -> Result<(), Error> {
         self.get().serialize(serializer)
@@ -465,7 +465,7 @@ where
 
 impl<T> BinSerialize for Cow<'_, T>
 where
-    T: BinSerialize + ToOwned,
+    T: BinSerialize + ToOwned + ?Sized,
 {
     fn serialize<S: BinSerializer>(&self, serializer: S) -> Result<()> {
         (&**self).serialize(serializer)
@@ -475,7 +475,7 @@ where
 // For convenience, deserializing into the owned variant here.
 impl<'de, T> BinDeserialize<'de> for Cow<'_, T>
 where
-    T: ToOwned + Clone,
+    T: ToOwned + Clone + ?Sized,
     T::Owned: BinDeserialize<'de>,
 {
     fn deserialize<D: BinDeserializer<'de>>(deserializer: D) -> Result<Self> {
