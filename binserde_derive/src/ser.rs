@@ -1,10 +1,10 @@
 use std::borrow::Cow;
 
 use darling::ast::{Data, Fields, Style};
+use proc_macro2::TokenStream;
 use quote::quote;
 
 use crate::common::*;
-use proc_macro2::TokenStream;
 
 pub fn impl_bin_serialize(opts: &BinSerdeOpts) -> TokenStream {
     let name = &opts.ident;

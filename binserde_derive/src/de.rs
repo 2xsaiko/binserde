@@ -1,6 +1,6 @@
 use darling::ast::{Data, Fields, Style};
-use quote::quote;
 use proc_macro2::TokenStream;
+use quote::quote;
 use syn::Index;
 
 use crate::common::*;
@@ -21,7 +21,7 @@ pub fn impl_bin_deserialize(opts: &BinSerdeOpts) -> TokenStream {
         }
     };
 
-    let generic_defs = generic_defs(opts).map_or_else(||quote!(<'de>), |el| quote!(<'de, #el>));
+    let generic_defs = generic_defs(opts).map_or_else(|| quote!(<'de>), |el| quote!(<'de, #el>));
     let generic_params = generic_params_on_target(opts).map(|el| quote!(<#el>));
     let where_clause = add_trait_bounds(opts, &quote!(::binserde::BinDeserialize<'de>));
 

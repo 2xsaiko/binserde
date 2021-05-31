@@ -18,8 +18,9 @@
 //! ```
 //! use std::fs::File;
 //! use std::io::BufReader;
+//! use binserde_derive::{BinDeserialize, BinSerialize};
 //!
-//! #[derive(BinSerialize, BinDeserialize, Eq, PartialEq)]
+//! #[derive(Debug, BinSerialize, BinDeserialize, Eq, PartialEq)]
 //! struct MyData {
 //!     v1: String,
 //!     v2: Option<usize>,
@@ -69,6 +70,8 @@
 //! #### Example:
 //!
 //! ```
+//! use binserde_derive::BinSerialize;
+//!
 //! #[derive(BinSerialize)]
 //! struct S {
 //!     w: u8,
@@ -78,9 +81,9 @@
 //!     z: u8,
 //! }
 //!
-//! let vec = binserde::serialize(&S { w: 0, x: 1, y: 2, z: 3 });
+//! let vec = binserde::serialize(&S { w: 0, x: 1, y: 2, z: 3 }).unwrap();
 //!
-//! assert_eq!(&[2, 3, 0, 1], &vec);
+//! assert_eq!(&[2, 3, 0, 1], &*vec);
 //! ```
 //!
 //! The attribute moved `y` and `z` into position 0, pushing `w` and `x` back to
@@ -92,6 +95,8 @@
 //! order:
 //!
 //! ```
+//! use binserde_derive::BinSerialize;
+//!
 //! #[derive(BinSerialize)]
 //! struct S {
 //!     w: u8,
@@ -147,9 +152,9 @@ use std::io::{Cursor, Read, Write};
 use std::num::TryFromIntError;
 use std::string::FromUtf8Error;
 
+pub use binserde_derive::{BinDeserialize, BinSerialize};
 use thiserror::Error;
 
-pub use binserde_derive::{BinDeserialize, BinSerialize};
 use de::BinDeserializeOwned;
 pub use de::{BinDeserialize, BinDeserializer};
 use dedup::DedupContext;
@@ -165,9 +170,9 @@ pub mod ser;
 pub mod serde;
 mod serdeimpl;
 pub mod try_iter;
+pub mod util;
 mod varint;
 mod write_ext;
-pub mod util;
 
 pub fn serialize<T>(value: &T) -> Result<Vec<u8>>
 where
@@ -280,88 +285,95 @@ impl Error {
     }
 }
 
-#[test]
-fn serialize_inline_test() {
-    use std::collections::{HashMap, HashSet};
+#[cfg(test)]
+mod test {
+    use binserde_derive::{BinDeserialize, BinSerialize};
 
-    #[derive(Debug, PartialEq, Eq, BinSerialize, BinDeserialize)]
-    struct Test {
-        vec: Vec<Test1>,
-        map_set: HashMap<String, HashSet<String>>,
-        test2: Vec<Test2>,
+    use crate::{deserialize, deserialize_with, serialize, serialize_with, Mode};
+
+    #[test]
+    fn serialize_inline_test() {
+        use std::collections::{HashMap, HashSet};
+
+        #[derive(Debug, PartialEq, Eq, BinSerialize, BinDeserialize)]
+        struct Test {
+            vec: Vec<Test1>,
+            map_set: HashMap<String, HashSet<String>>,
+            test2: Vec<Test2>,
+        }
+
+        #[derive(Debug, PartialEq, Eq, BinSerialize, BinDeserialize)]
+        struct Test1(String, i32);
+
+        #[derive(Debug, PartialEq, Eq, BinSerialize, BinDeserialize)]
+        enum Test2 {
+            A,
+            B(i32, i32, i32),
+            C { thing: i64 },
+        }
+
+        let s = Test {
+            vec: vec![
+                Test1("yyyyyyyyyyyyyyyyyy".to_string(), 4),
+                Test1("a".to_string(), 4),
+                Test1("yyyyyyyyyyyyyyyyyy".to_string(), 4),
+                Test1("ab".to_string(), 4),
+                Test1("abc".to_string(), 4),
+                Test1("abcd".to_string(), 4),
+            ],
+            map_set: vec![("a", vec!["a", "b", "c"]), ("a1", vec!["a1", "b1", "c1"])]
+                .into_iter()
+                .map(|el| {
+                    (
+                        el.0.to_string(),
+                        el.1.into_iter().map(|el| el.to_string()).collect(),
+                    )
+                })
+                .collect(),
+            test2: vec![
+                Test2::A,
+                Test2::B(1, 1992323, 5),
+                Test2::C {
+                    thing: 23456788765432,
+                },
+            ],
+        };
+
+        {
+            let mode = Mode::dedup();
+
+            let buf = serialize_with(&s, mode).expect("failed to serialize");
+            println!("{:02X?}", buf);
+
+            let s1: Test = deserialize_with(&buf, mode).expect("failed to deserialize");
+
+            assert_eq!(s, s1);
+        }
+
+        {
+            let buf = serialize(&s).expect("failed to serialize");
+            println!("{:02X?}", buf);
+
+            let s1: Test = deserialize(&buf).expect("failed to deserialize");
+
+            assert_eq!(s, s1);
+        }
     }
 
-    #[derive(Debug, PartialEq, Eq, BinSerialize, BinDeserialize)]
-    struct Test1(String, i32);
+    #[test]
+    fn serialize_constant_output() {
+        assert_eq!(&[3, 97, 98, 99], &*serialize(&"abc").unwrap());
 
-    #[derive(Debug, PartialEq, Eq, BinSerialize, BinDeserialize)]
-    enum Test2 {
-        A,
-        B(i32, i32, i32),
-        C { thing: i64 },
+        assert_eq!(&[0xFF], &*serialize(&true).unwrap());
+        assert_eq!(&[0x00], &*serialize(&false).unwrap());
+
+        assert_eq!(
+            &[0x03, 0x02, 0x05, 0x45],
+            &*serialize_with(
+                &[1i16, -3i16, -35i16] as &[i16],
+                Mode::default().with_fixed_size_use_varint(true)
+            )
+            .unwrap()
+        );
     }
-
-    let s = Test {
-        vec: vec![
-            Test1("yyyyyyyyyyyyyyyyyy".to_string(), 4),
-            Test1("a".to_string(), 4),
-            Test1("yyyyyyyyyyyyyyyyyy".to_string(), 4),
-            Test1("ab".to_string(), 4),
-            Test1("abc".to_string(), 4),
-            Test1("abcd".to_string(), 4),
-        ],
-        map_set: vec![("a", vec!["a", "b", "c"]), ("a1", vec!["a1", "b1", "c1"])]
-            .into_iter()
-            .map(|el| {
-                (
-                    el.0.to_string(),
-                    el.1.into_iter().map(|el| el.to_string()).collect(),
-                )
-            })
-            .collect(),
-        test2: vec![
-            Test2::A,
-            Test2::B(1, 1992323, 5),
-            Test2::C {
-                thing: 23456788765432,
-            },
-        ],
-    };
-
-    {
-        let mode = Mode::dedup();
-
-        let buf = serialize_with(&s, mode).expect("failed to serialize");
-        println!("{:02X?}", buf);
-
-        let s1: Test = deserialize_with(&buf, mode).expect("failed to deserialize");
-
-        assert_eq!(s, s1);
-    }
-
-    {
-        let buf = serialize(&s).expect("failed to serialize");
-        println!("{:02X?}", buf);
-
-        let s1: Test = deserialize(&buf).expect("failed to deserialize");
-
-        assert_eq!(s, s1);
-    }
-}
-
-#[test]
-fn serialize_constant_output() {
-    assert_eq!(&[3, 97, 98, 99], &*serialize(&"abc").unwrap());
-
-    assert_eq!(&[0xFF], &*serialize(&true).unwrap());
-    assert_eq!(&[0x00], &*serialize(&false).unwrap());
-
-    assert_eq!(
-        &[0x03, 0x02, 0x05, 0x45],
-        &*serialize_with(
-            &[1i16, -3i16, -35i16] as &[i16],
-            Mode::default().with_fixed_size_use_varint(true)
-        )
-        .unwrap()
-    );
 }

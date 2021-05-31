@@ -166,9 +166,14 @@ fn swap_outer<T>(slice: &mut [T], count: usize) {
     left.swap_with_slice(right);
 }
 
-#[test]
-fn test_swap_at() {
-    let mut arr = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14];
-    swap_at(&mut arr, 3);
-    assert_eq!([4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 1, 2, 3], arr);
+#[cfg(test)]
+mod test {
+    use crate::common::swap_at;
+
+    #[test]
+    fn test_swap_at() {
+        let mut arr = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14];
+        swap_at(&mut arr, 3);
+        assert_eq!([4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 1, 2, 3], arr);
+    }
 }
