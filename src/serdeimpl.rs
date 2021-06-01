@@ -476,7 +476,7 @@ where
 // For convenience, deserializing into the owned variant here.
 impl<'de, T> BinDeserialize<'de> for Cow<'_, T>
 where
-    T: ToOwned + Clone + ?Sized,
+    T: ToOwned + ?Sized,
     T::Owned: BinDeserialize<'de>,
 {
     fn deserialize<D: BinDeserializer<'de>>(deserializer: D) -> Result<Self> {
